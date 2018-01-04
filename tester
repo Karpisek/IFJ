@@ -1,0 +1,363 @@
+#!/bin/bash
+
+# testovaci skript
+# testy jsou ve slozce tests a v podslozkach oznacene jako ocekavane navratove kody
+# takze testy, ktere by mely projit jsou ve slozce 0
+# testy na lex jsou v 1 atd..
+# k testu v 0 je mozne dodat i .stdin soubor ktery je jako vstup z klavesnice pro interpret ic17int (z wisu)
+# k testu v 0 je mozne taky dodat .stdout soubor jako ocekavany vystup, ktery se porovna s vystupem-
+# z interpretu a zobrazi tedy jestli vystupy sedi ci nikoliv
+# zaroven se vypisuje u testu OK a notOK a to znaci zda ocekavany navratovy kod sedi s nazvem slozky-
+# ze ktere test je
+# navod na testy:
+# tests/ocekavanyNavratovyKod/num.code - kod v jazyce IFJ17
+# tests/ocekavanyNavratovyKod/num.stdin - pripadny vstup pri finalni interpretaci (pouze slozka 0)
+# tests/ocekavanyNavratovyKod/num.stdout - pripadny ocekavany stdout (pouze slozka 0)
+
+#deklarace placeholderu
+PROJ_NAME=ifj
+INTERPRET=ic17int
+TESTS=tests
+TESTS_SINGLE=tests_single
+TESTS_RESULTS=tests_results
+TESTS_RESULTS_SINGLE=tests_results_single
+
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+RESET=$(tput sgr0)
+REV=$(tput rev)
+
+WIDTH=$(tput cols)
+LINE=$(for (( i=0; i<$WIDTH; i++ )); do echo -n "─"; done; echo "")
+
+line() {
+	echo "$LINE"
+}
+
+icError=(
+	[50]="chybne zadane vstupni parametry na prikazovem radku pri spousteni interpretu."
+	[51]="chyba pri analyze (lexikalni, syntakticka) vstupniho kódu v IFJcode17."
+	[52]="chyba pri semantickych kontrolach vstupniho kódu v IFJcode17."
+	[53]="behova chyba interpretace – spatne typy operandu."
+	[54]="behova chyba interpretace – pristup k neexistujici promenne (ramec existuje)."
+	[55]="behova chyba interpretace – ramecn eexistuje (napr.cteni z prazdneho zasobniku ramcu)."
+	[56]="behova chyba interpretace – chybejici hodnota (v promenne nebo na datovem zasobniku)."
+	[57]="behova chyba interpretace – deleni nulou."
+	[58]="behova chyba interpretace – chybna prace s retezcem."
+	[60]="interni chyba interpretu tj. neovlivnena vstupnim programem (napr. chyba alokace pameti, chyba pri otvirani souboru s ridicim programem atd.)."
+	)
+
+doInterpret=false
+printAll=true
+
+help() {
+	echo "tytp parametry lze kombinovat:"
+	echo "--interpret - spusti taky interpret ic17int"
+	echo "--nocode - pri erroru vypise jen ic17int retcode a ic17inr stderr"
+	echo "--single - samostatny test; pr.: --single 0/ahoj.code"
+	echo "tyto paramtry nelze kombinovat:"
+	echo "--toolkit-no-interpret - spusti toolkit s testy bez interpretace"
+	echo "--toolkit-interpret - spusti toolkit s testy s interpretaci"
+	exit
+}
+
+while [ "$#" != "0" ]; do
+case $1 in
+	--help)
+		shift
+		help
+		;;
+	--interpret)
+		shift
+		doInterpret=true
+		;;
+	--nocode)
+		shift
+		printAll=false
+		;;
+	--single)
+		shift
+		singleTest=true
+		singleFileName=$1
+		shift
+		;;
+	--toolkit-no-interpret)
+		shift
+		toolkit=true
+		;;
+	--toolkit-interpret)
+		shift
+		toolkit=true
+		toolkitInterpret=true
+		;;
+	* )
+		shift
+		help
+		exit
+esac
+done
+
+make clean
+make
+
+if [[ "$toolkit" = true ]]; then
+	if [[ "$toolkitInterpret" = true ]]; then
+		python3 VUT-FIT-IFJ-2017-toolkit/test.py --command-timeout 30 ./ifj
+	else
+		python3 VUT-FIT-IFJ-2017-toolkit/test.py --no-interpreter --command-timeout 30 ./ifj
+	fi
+
+	exit
+fi
+
+if [[ "$singleTest" = true && "$singleFileName" == "" ]]; then
+	help
+fi
+
+totalIfjOK=0
+totalIfjNotOK=0
+totalInterpretOK=0
+totalInterpretNotOK=0
+totalStdout=0
+totalInterpretStdoutOK=0
+totalInterpretStdoutNotOK=0
+
+if [ ! -f $PROJ_NAME ]; then
+	make
+fi
+
+# smaze vystupni slozku, popripade vytvori znova
+if [ -d $TESTS_RESULTS ]; then
+	rm -rf $TESTS_RESULTS
+fi
+mkdir $TESTS_RESULTS
+mkdir $TESTS_RESULTS/0
+mkdir $TESTS_RESULTS/1
+mkdir $TESTS_RESULTS/2
+mkdir $TESTS_RESULTS/3
+mkdir $TESTS_RESULTS/4
+
+if [ -d $TESTS_SINGLE ]; then
+	rm -rf $TESTS_SINGLE
+fi
+mkdir $TESTS_SINGLE
+mkdir $TESTS_SINGLE/0
+mkdir $TESTS_SINGLE/1
+mkdir $TESTS_SINGLE/2
+mkdir $TESTS_SINGLE/3
+mkdir $TESTS_SINGLE/4
+
+if [ -d $TESTS_RESULTS_SINGLE ]; then
+	rm -rf $TESTS_RESULTS_SINGLE
+fi
+mkdir $TESTS_RESULTS_SINGLE
+mkdir $TESTS_RESULTS_SINGLE/0
+mkdir $TESTS_RESULTS_SINGLE/1
+mkdir $TESTS_RESULTS_SINGLE/2
+mkdir $TESTS_RESULTS_SINGLE/3
+mkdir $TESTS_RESULTS_SINGLE/4
+
+if [[ "$singleTest" = true ]]; then
+	singleFileName=$(echo "$singleFileName" | cut -d'.' -f1)
+
+	cp "$TESTS"/"$singleFileName".code "$TESTS_SINGLE"/"$singleFileName".code
+	
+	if [ -f "$TESTS"/"$singleFileName".stdin ]; then
+		cp "$TESTS"/"$singleFileName".stdin "$TESTS_SINGLE"/"$singleFileName".stdin 
+	fi
+	if [ -f "$TESTS"/"$singleFileName".stdout ]; then
+		cp "$TESTS"/"$singleFileName".stdout "$TESTS_SINGLE"/"$singleFileName".stdout
+	fi
+
+	TESTS=$TESTS_SINGLE
+	TESTS_RESULTS=$TESTS_RESULTS_SINGLE
+fi
+
+line
+
+totalNUM=$(find "$TESTS" -type f -name "*.code" | sort -n | wc -l)
+
+#najde vsechny slozky ve slozce s testama (v ansem pripade slozka tests)
+for FOLDER in $TESTS/*; do
+	#vyextrahuji si nazev slozky (0, 1, ...)
+	folderName=$(echo "$FOLDER" | rev | cut -d'/' -f1 | rev)
+
+	#cesta k vystupni slozce
+	testResultFolder="$TESTS_RESULTS"/"$folderName"
+
+	FILES=$(find "$FOLDER" -type f -name "*.code" | sort -g)
+
+	#najde vsechny zdrojove kody v jazyce ifj17 (pripona .code)
+	for FILE in $FILES; do
+		(( totalTested++ ))
+		resultPrint=""
+		return=-1
+		#printCode=false
+
+		#vyextrahuji si nazev souboru bez pripony (001, 002, ...)
+		fileName=$(echo "$FILE" | rev | cut -d'/' -f1 | rev | cut -d'.' -f1)
+
+		#spustim prekladac (ifj)
+		./$PROJ_NAME < "$FOLDER"/"$fileName".code > out.IFJcode 2> ifjstderr
+		return=$(echo $?) #uchovam si navratovou hodnotu
+
+		if [ "$return" -eq "$folderName" ]; then
+			# pokud navratova hodnota sedi s nazvem slozky
+
+			(( totalIfjOK++ ))
+			result=OK # navratovy kod sedi
+			resultPrint="${GREEN}OK${RESET}"
+			PRINT=$(echo -n "$FILE: ifj returned $resultPrint return: $return expect: $folderName")
+		else
+			(( totalIfjNotOK++ ))
+			result=notOK # navratovy kod sedi
+			resultPrint="${REV}${RED}notOK${RESET}"
+			PRINT=$(echo -n "$FILE: ifj returned $resultPrint return: $return expect: $folderName")
+		fi
+
+		if [[ "$folderName" -eq 0 ]]; then
+			if [[ -s "out.IFJcode" ]]; then
+				testCode=OK
+				testCodePrint="${GREEN}OK${RESET}"
+			else
+				testCode=notOK
+				testCodePrint="${REV}${RED}notOK${RESET}"
+			fi
+		PRINT+=$(echo " output: $testCodePrint")
+		fi
+
+		echo "$PRINT"
+
+		if [[ "$printAll" = true ]]; then
+			if [[ -s "ifjstderr" && $resultPrint == "${REV}${RED}notOK${RESET}" ]]; then
+				line
+				echo "ifj stderr:"
+				cat ifjstderr
+				line
+				
+			fi
+			
+
+			if [[ "$resultPrint" == "${REV}${RED}notOK${RESET}" && "$doInterpret" = false ]]; then
+				line
+				echo "$fileName.code:"
+				cat "$FOLDER"/"$fileName".code
+				echo ""
+				line
+			fi
+		fi
+		rm ifjstderr
+
+		fileNameNew=$fileName'-'$return'_'$result'_'$testCode.IFJcode
+		mv out.IFJcode "$testResultFolder"/"$fileNameNew"
+		
+
+		if [[ "$doInterpret" = true && "$folderName" -eq 0 ]] ; then
+			#pustim interpret s nasim vystupnim kodem (.IFJcode), vstup .stdin (pokud je), 
+			#interpretovany vystup se ulozi do souboru .out ve vystupni slozce
+
+			(( totalInterpreted++ ))
+
+			if [ -f "$FOLDER"/"$fileName".stdin ]; then
+				./$INTERPRET "$testResultFolder"/"$fileNameNew" < "$FOLDER"/"$fileName".stdin > stdout 2> stderr
+				returnInterpret=$(echo $?) #uchovam si navratovou hodnotu
+			else
+				./$INTERPRET "$testResultFolder"/"$fileNameNew" > stdout 2> stderr
+				returnInterpret=$(echo $?) #uchovam si navratovou hodnotu
+			fi
+
+			if [ "$returnInterpret" -eq 0 ]; then
+				(( totalInterpretOK++ ))
+			else
+				(( totalInterpretNotOK++ ))
+			fi
+
+			if [ -f "$FOLDER"/"$fileName".stdout ]; then
+				#pokud je nejaky ocekavany stdout
+
+				(( totalStdout++ ))
+
+				#presunu a prejmenuju si vystup z interpretu do vystupni slozky
+				mv stdout "$testResultFolder"/"$fileName".stdout
+
+				#porovnani vystupu (ocekavany vs interpretovany)
+				if cmp -s "$FOLDER"/"$fileName".stdout "$testResultFolder"/"$fileName".stdout; then
+					(( totalInterpretStdoutOK++ ))
+					echo "$FILE: stdout cmp ${GREEN}OK${RESET}"
+				else
+					(( totalInterpretStdoutNotOK++ ))
+					echo "$FILE: stdout cmp ${REV}${RED}notOK${RESET}"
+					echo "ic17int retcode: ${REV}${RED}$returnInterpret${RESET} - ${icError[returnInterpret]}"
+					if [[ "$printAll" = true ]]; then
+					line
+					if [ -f "$FOLDER"/"$fileName".stdin ]; then
+						echo "stdin:"
+						cat "$FOLDER"/"$fileName".stdin
+						echo "<EOF>"
+						line
+					fi
+					echo "expected stdout:"
+					cat "$FOLDER"/"$fileName".stdout
+					echo "<EOF>"
+					line
+					echo "result:"
+					cat "$testResultFolder"/"$fileName".stdout
+					echo "<EOF>"
+					line
+					#printCode=true
+				fi
+				fi
+			else
+				#jinak ho smazu
+
+				rm stdout
+			fi
+
+			if [ -s "stderr" ]; then
+				# jestli to udelalo nejaky stderr, vypisu ho a s nim i 3adr kod
+
+				echo "ic17int stderr:"
+				cat stderr
+				line
+				#printCode=true
+			
+				rm stderr
+
+				if [[ "$printAll" = true ]]; then
+					echo "code:"
+					cat "$FOLDER"/"$fileName".code
+					echo "<EOF>"
+					line
+					echo "3adr:"
+					cat "$testResultFolder"/"$fileNameNew"
+					line
+				fi
+			fi
+		fi
+	done
+done
+
+totalIfjCheck="${REV}${RED}notOK${RESET}"
+if [[ $totalNUM -eq $totalTested ]]; then
+	totalIfjCheck="${GREEN}OK${RESET}"
+fi
+
+totalIcCheck="${REV}${RED}notOK${RESET}"
+if [[ $totalInterpreted -eq $totalInterpretOK ]]; then
+	totalIcCheck="${GREEN}OK${RESET}"
+fi
+
+totalIcStdoutCheck="${REV}${RED}notOK${RESET}"
+if [[ $totalStdout -eq $totalInterpretStdoutOK ]]; then
+	totalIcStdoutCheck="${GREEN}OK${RESET}"
+fi
+
+line
+echo "RESULTS:"
+echo -e "Tests count: $totalNUM"
+echo -e "ifj\\t\\t ${GREEN}OK${RESET}: $totalIfjOK \\t| ${RED}NOT OK${RESET}: $totalIfjNotOK \\t| TOTAL: $totalTested $totalIfjCheck"
+
+if $doInterpret ; then
+	echo -e "ic17int\\t\\t ${GREEN}OK${RESET}: $totalInterpretOK \\t| ${RED}NOT OK${RESET}: $totalInterpretNotOK \\t| TOTAL: $totalInterpreted $totalIcCheck"
+	echo -e "ic17int Stdout\\t ${GREEN}OK${RESET}: $totalInterpretStdoutOK \\t| ${RED}NOT OK${RESET}: $totalInterpretStdoutNotOK \\t| TOTAL: $totalStdout $totalIcStdoutCheck"
+fi

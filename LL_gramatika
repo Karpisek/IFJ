@@ -1,0 +1,92 @@
+/**
+ *  Fakutla informacnich technologii, Vysoke uceni technicke v Brne
+ *	Projekt IFJ
+ *  Implementace prekladace imperativniho jazyka IFJ17
+ *
+ *  Tym:    Jakub Trubka        (xtrubk00)
+ *          Roman Zajic         (xzajic16)
+ *          Miroslav Karpisek   (xkarpi05)
+ *          Jakub Samek         (xsamek07)
+ *
+ *  Soubor: LL_gramatika.h
+ *  Autori: Miroslav Karpisek
+ *          Jakub Trubka
+ *
+ *	Datum:  20-10-2017
+ *  Uprava: 01-12-2017
+ */
+
+1       <program>           ->  <declareList> <body>
+2       <body>              ->  SCOPE EOL <statList> END SCOPE
+
+3       <declareList>       ->  <declare> <space> <declareList>
+4       <declareList>       ->  ε
+5       <declare>           ->  DECLARE FUNCTION id ( <paramsList> ) AS <type>
+6       <declare>           ->  FUNCTION id ( <paramsList> ) AS <type> EOL <statList> END FUNCTION //return
+
+7       <paramsList>        ->  <param> <paramNext>
+8       <paramsList>        ->  ε
+9       <paramNext>         ->  , <param> <paramNext>
+10      <paramNext>         ->  ε
+11      <param>             ->  id AS <type>
+
+12      <statList>          ->  <stat> EOL <statList>
+13      <statList>          ->  ε
+
+14      <stat>              ->  <declareVar>
+15      <stat>              ->  id <assigment> <expr>                                                 // move
+16      <stat>              ->  INPUT id                                                    // input
+17      <stat>              ->  PRINT <expr> ; <exprList>                                   // print zasobnik
+18      <stat>              ->  IF <expr> THEN EOL <statList> <ifstat>
+19      <stat>              ->  DO WHILE <expr> EOL <statList> LOOP                         // furt dokola
+20      <stat>              ->  RETURN <expr>
+21      <stat>              ->  <body>
+22      <stat>              ->  ε
+
+23      <ifstat>            ->  ELSE EOL <statList> END IF
+24      <ifstat>            ->  ELSEIF THEN EOL <statList> <ifstat>
+25      <ifstat>            ->  END IF
+
+26      <exprList>          ->  <expr> ; <exprList>
+27      <exprList>          ->  ε
+28      <declareVar>        ->  DIM id AS <type> <definition> //prvne do tab.symbolu
+29      <definition>        ->  = <expr> // pop->move
+30      <definition>        ->  ε
+31      <type>              ->  INTEGER
+32      <type>              ->  DOUBLE
+33      <type>              ->  STRING
+34      $                   ->  <space> <program> <space> EOF
+35      <space>             ->  EOL <space>
+36      <space>             ->  ε
+
+37      <assigment>         ->  +=
+38      <assigment>         ->  -=
+39      <assigment>         ->  *=
+40      <assigment>         ->  /=
+41      <assigment>         ->  \=
+
+
+GRAMATIKA VYRAZU, naznak... bude treba predelat, dodelat
+
+1       <E> -> i
+2       <E> -> <E> * <E>
+3       <E> -> <E> \ <E>
+4       <E> -> <E> / <E>
+5       <E> -> <E> + <E>
+6       <E> -> <E> - <E>
+7       <E> -> <E> < <E>
+8       <E> -> <E> > <E>
+9       <E> -> <E> = <E>
+10      <E> -> <E> <= <E>
+11      <E> -> <E> >= <E>
+13      <E> -> f(<E>)
+14      <E> -> (<E>)
+15      <E> -> <E> <> <E>
+16      <E> -> - <E>
+
+        // rozsireni
+        <E> -> i += <E>
+        <E> -> i -= <E>
+        <E> -> i *= <E>
+        <E> -> i \= <E>
+        <E> -> i /= <E>
